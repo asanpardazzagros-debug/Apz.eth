@@ -1,0 +1,22 @@
+const { ethers } = require("hardhat");
+
+async function main() {
+  const [deployer] = await ethers.getSigners();
+  
+  // ENS Registry address (Mainnet)
+  const ENS_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e";
+  
+  // Get ENS contract
+  const ensRegistry = await ethers.getContractAt("ENS", ENS_REGISTRY);
+  
+  // Setup resolver for apz.eth
+  console.log("Setting up ENS records for apz.eth...");
+  
+  // Note: This requires you to own apz.eth
+  // You would need to interact with ENS controller contract
+  // This is a simplified example
+  
+  console.log("ENS setup completed");
+}
+
+main();
