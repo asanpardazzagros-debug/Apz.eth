@@ -1,0 +1,80 @@
+🧪 ۴. تست‌های جامع
+
+test/APZToken.test.js
+
+```javascript
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+describe("APZToken", function () {
+  let APZToken;
+  let apzToken;
+  let owner;
+  let addr1;
+  let addr2;
+
+  beforeEach(async function () {
+    [owner, addr1, addr2] = await ethers.getSigners();
+    
+    APZToken = await ethers.getContractFactory("APZToken");
+    apzToken = await APZToken.deploy("APZ Token", "APZ", 18, 1000000, owner.address);
+    await apzToken.deployed();
+  });
+
+  describe("Deployment", function () {
+    it("Should set the right name and symbol", async function () {
+      expect(await apzToken.name()).to.equal("APZ Token");
+      expect(await apzToken.symbol()).to.equal("APZ");
+    });
+
+    it("Should mint initial supply to treasury", async function () {
+      const ownerBalance = await apzToken.balanceOf(owner.address);
+      expect(ownerBalance).to.equal(ethers.utils.parseEther("1000000"));
+    });
+
+    it("Should set the right decimals", async function () {
+      expect(await apzToken.decimals()).to.equal(18);
+    });
+  });
+
+  describe("Transactions", function () {
+    it("Should transfer tokens between accounts", async function () {
+      await apzToken.transfer(addr1.address, ethers.utils.parseEther("100"));
+      expect(await apzToken.balanceOf(addr1.address)).to.equal(ethers.utils.parseEther("100"));
+    });
+
+    it("Should fail if sender doesn't have enough tokens", async function () {
+      const initialOwnerBalance = await apzToken.balanceOf(owner.address);
+      
+      await expect(
+        apzToken.connect(addr1).transfer(owner.address, 1)
+      ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+      
+      expect(await apzToken.balanceOf(owner.address)).to.equal(initialOwnerBalance);
+    });
+
+    it("Should update balances after transfers", async function () {
+      const initialOwnerBalance = await apzToken.balanceOf(owner.address);
+      
+      await apzToken.transfer(addr1.address, ethers.utils.parseEther("100"));
+      await apzToken.transfer(addr2.address, ethers.utils.parseEther("50"));
+
+      const finalOwnerBalance = await apzToken.balanceOf(owner.address);
+      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(ethers.utils.parseEther("150")));
+
+      const addr1Balance = await apzToken.balanceOf(addr1.address);
+      expect(addr1Balance).to.equal(ethers.utils.parseEther("100"));
+
+      const addr2Balance = await apzToken.balanceOf(addr2.address);
+      expect(addr2Balance).to.equal(ethers.utils.parseEther("50"));
+    });
+  });
+
+  describe("Roles", function () {
+    it("Should grant roles correctly", async function () {
+      expect(await apzToken.hasRole(await apzToken.DEFAULT_ADMIN_ROLE(), owner.address)).to.be.true;
+      expect(await apzToken.hasRole(await apzToken.MINTER_ROLE(), owner.address)).to.be.true;
+    });
+  });
+});
+```
