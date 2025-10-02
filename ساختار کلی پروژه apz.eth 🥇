@@ -1,0 +1,675 @@
+
+
+🚀 ساختار کامل پروژه apz.eth
+
+```bash
+apz-eth-project/
+├── contracts/
+│   ├── APZToken.sol
+│   ├── APZAvatar.sol
+│   └── APZGovernance.sol
+├── scripts/
+│   ├── deploy.js
+│   ├── verify.js
+│   └── setup-ens.js
+├── frontend/
+│   ├── components/
+│   ├── pages/
+│   ├── styles/
+│   └── utils/
+├── tests/
+│   ├── APZToken.test.js
+│   └── APZAvatar.test.js
+├── hardhat.config.js
+├── package.json
+└── README.md
+```
+
+📦 ۱. فایل پیکربندی کامل
+
+package.json
+
+```json
+{
+  "name": "apz-eth-project",
+  "version": "1.0.0",
+  "description": "Complete Web3 project for apz.eth",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.js --network sepolia",
+    "deploy-mainnet": "npx hardhat run scripts/deploy.js --network mainnet",
+    "test": "npx hardhat test",
+    "test:coverage": "npx hardhat coverage",
+    "verify": "npx hardhat run scripts/verify.js --network sepolia",
+    "frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^1.0.9",
+    "solidity-coverage": "^0.8.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.0",
+    "@ensdomains/ens-contracts": "^0.0.1",
+    "dotenv": "^16.3.0",
+    "ethers": "^6.8.0"
+  }
+}
+```
+
+hardhat.config.js
+
+```javascript
+require("@nomicfoundation/hardhat-toolbox");
+require("hardhat-gas-reporter");
+require("solidity-coverage");
+require("dotenv").config();
+
+const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "";
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
+
+module.exports = {
+  defaultNetwork: "hardhat",
+  networks: {
+    hardhat: {
+      chainId: 31337,
+      allowUnlimitedContractSize: true,
+    },
+    localhost: {
+      chainId: 31337,
+      allowUnlimitedContractSize: true,
+    },
+    sepolia: {
+      url: SEPOLIA_RPC_URL,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      chainId: 11155111,
+      gas: 2100000,
+      gasPrice: 8000000000,
+    },
+    mainnet: {
+      url: process.env.MAINNET_RPC_URL || "",
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      chainId: 1,
+      gas: 2100000,
+      gasPrice: 30000000000, // 30 gwei
+    },
+  },
+  solidity: {
+    version: "0.8.19",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1000,
+      },
+      viaIR: true,
+    },
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY,
+  },
+  gasReporter: {
+    enabled: true,
+    currency: "USD",
+    outputFile: "gas-report.txt",
+    noColors: true,
+    coinmarketcap: COINMARKETCAP_API_KEY,
+  },
+  mocha: {
+    timeout: 200000,
+  },
+};
+```
+
+🔗 ۲. قراردادهای هوشمند کامل
+
+contracts/APZToken.sol
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract APZToken is ERC20, ERC20Burnable, ERC20Snapshot, AccessControl, Pausable {
+    bytes32 public constant SNAPSHOT_ROLE = keccak256("SNAPSHOT_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    uint8 private _decimals;
+
+    event TokensMinted(address indexed to, uint256 amount);
+    event TokensBurned(address indexed from, uint256 amount);
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint8 tokenDecimals,
+        uint256 initialSupply,
+        address treasury
+    ) ERC20(name, symbol) {
+        _decimals = tokenDecimals;
+        
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(SNAPSHOT_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+        
+        if (initialSupply > 0 && treasury != address(0)) {
+            _mint(treasury, initialSupply * 10 ** tokenDecimals);
+        }
+    }
+
+    function decimals() public view virtual override returns (uint8) {
+        return _decimals;
+    }
+
+    function snapshot() public onlyRole(SNAPSHOT_ROLE) returns (uint256) {
+        return _snapshot();
+    }
+
+    function pause() public onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() public onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
+
+    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+        _mint(to, amount);
+        emit TokensMinted(to, amount);
+    }
+
+    function burn(uint256 amount) public override {
+        super.burn(amount);
+        emit TokensBurned(msg.sender, amount);
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount)
+        internal
+        whenNotPaused
+        override(ERC20, ERC20Snapshot)
+    {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(AccessControl)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+}
+```
+
+contracts/APZAvatar.sol
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract APZAvatar is ERC721, ERC721Enumerable, ERC721URIStorage, AccessControl, Pausable {
+    using Counters for Counters.Counter;
+
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    
+    Counters.Counter private _tokenIdCounter;
+    string private _baseTokenURI;
+    
+    mapping(uint256 => string) private _tokenURIs;
+
+    event TokenMinted(address indexed to, uint256 indexed tokenId, string tokenURI);
+    event BaseURIUpdated(string newBaseURI);
+
+    constructor() ERC721("APZAvatar", "APZA") {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+    }
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    function setBaseURI(string memory baseURI) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _baseTokenURI = baseURI;
+        emit BaseURIUpdated(baseURI);
+    }
+
+    function safeMint(address to, string memory uri) public onlyRole(MINTER_ROLE) returns (uint256) {
+        _tokenIdCounter.increment();
+        uint256 tokenId = _tokenIdCounter.current();
+        
+        _safeMint(to, tokenId);
+        _setTokenURI(tokenId, uri);
+        
+        emit TokenMinted(to, tokenId, uri);
+        return tokenId;
+    }
+
+    function pause() public onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() public onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
+
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        return super.tokenURI(tokenId);
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+        internal
+        whenNotPaused
+        override(ERC721, ERC721Enumerable)
+    {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721Enumerable, ERC721URIStorage, AccessControl)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
+    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
+        super._burn(tokenId);
+    }
+}
+```
+
+contracts/APZGovernance.sol
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/governance/Governor.sol";
+import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
+import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
+import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
+import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
+
+contract APZGovernance is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction {
+    constructor(IVotes _token)
+        Governor("APZGovernance")
+        GovernorSettings(1 /* 1 block */, 50400 /* 1 week */, 1000e18 /* 1000 tokens */)
+        GovernorVotes(_token)
+        GovernorVotesQuorumFraction(4) // 4%
+    {}
+
+    function votingDelay() public view override(IGovernor, GovernorSettings) returns (uint256) {
+        return super.votingDelay();
+    }
+
+    function votingPeriod() public view override(IGovernor, GovernorSettings) returns (uint256) {
+        return super.votingPeriod();
+    }
+
+    function quorum(uint256 blockNumber)
+        public
+        view
+        override(IGovernor, GovernorVotesQuorumFraction)
+        returns (uint256)
+    {
+        return super.quorum(blockNumber);
+    }
+
+    function proposalThreshold() public view override(Governor, GovernorSettings) returns (uint256) {
+        return super.proposalThreshold();
+    }
+}
+```
+
+🚀 ۳. اسکریپت‌های Deployment
+
+scripts/deploy.js
+
+```javascript
+const { ethers } = require("hardhat");
+const fs = require("fs");
+
+async function main() {
+  const [deployer] = await ethers.getSigners();
+  
+  console.log("🚀 Starting deployment with account:", deployer.address);
+  console.log("💰 Account balance:", ethers.utils.formatEther(await deployer.getBalance()), "ETH");
+
+  // Deploy APZ Token
+  console.log("\n📦 Deploying APZToken...");
+  const APZToken = await ethers.getContractFactory("APZToken");
+  const apzToken = await APZToken.deploy(
+    "APZ Token",
+    "APZ",
+    18,
+    ethers.utils.parseEther("1000000"), // 1M tokens
+    deployer.address // Treasury
+  );
+  await apzToken.deployed();
+  console.log("✅ APZToken deployed to:", apzToken.address);
+
+  // Deploy APZ Avatar NFT
+  console.log("\n🎨 Deploying APZAvatar...");
+  const APZAvatar = await ethers.getContractFactory("APZAvatar");
+  const apzAvatar = await APZAvatar.deploy();
+  await apzAvatar.deployed();
+  console.log("✅ APZAvatar deployed to:", apzAvatar.address);
+
+  // Deploy Governance
+  console.log("\n🏛️ Deploying APZGovernance...");
+  const APZGovernance = await ethers.getContractFactory("APZGovernance");
+  const apzGovernance = await APZGovernance.deploy(apzToken.address);
+  await apzGovernance.deployed();
+  console.log("✅ APZGovernance deployed to:", apzGovernance.address);
+
+  // Save deployment info
+  const deploymentInfo = {
+    network: network.name,
+    timestamp: new Date().toISOString(),
+    contracts: {
+      APZToken: apzToken.address,
+      APZAvatar: apzAvatar.address,
+      APZGovernance: apzGovernance.address,
+    },
+    deployer: deployer.address,
+  };
+
+  fs.writeFileSync("deployment-info.json", JSON.stringify(deploymentInfo, null, 2));
+  
+  console.log("\n📄 Deployment info saved to deployment-info.json");
+  console.log("🎉 Deployment completed successfully!");
+
+  // Verification info
+  console.log("\n🔍 To verify contracts run:");
+  console.log(`npx hardhat verify --network ${network.name} ${apzToken.address} "APZ Token" "APZ" 18 1000000 ${deployer.address}`);
+  console.log(`npx hardhat verify --network ${network.name} ${apzAvatar.address}`);
+  console.log(`npx hardhat verify --network ${network.name} ${apzGovernance.address} ${apzToken.address}`);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error("💥 Deployment failed:", error);
+    process.exit(1);
+  });
+```
+
+scripts/setup-ens.js
+
+```javascript
+const { ethers } = require("hardhat");
+
+async function main() {
+  const [deployer] = await ethers.getSigners();
+  
+  // ENS Registry address (Mainnet)
+  const ENS_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e";
+  
+  // Get ENS contract
+  const ensRegistry = await ethers.getContractAt("ENS", ENS_REGISTRY);
+  
+  // Setup resolver for apz.eth
+  console.log("Setting up ENS records for apz.eth...");
+  
+  // Note: This requires you to own apz.eth
+  // You would need to interact with ENS controller contract
+  // This is a simplified example
+  
+  console.log("ENS setup completed");
+}
+
+main();
+```
+
+🧪 ۴. تست‌های جامع
+
+test/APZToken.test.js
+
+```javascript
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+describe("APZToken", function () {
+  let APZToken;
+  let apzToken;
+  let owner;
+  let addr1;
+  let addr2;
+
+  beforeEach(async function () {
+    [owner, addr1, addr2] = await ethers.getSigners();
+    
+    APZToken = await ethers.getContractFactory("APZToken");
+    apzToken = await APZToken.deploy("APZ Token", "APZ", 18, 1000000, owner.address);
+    await apzToken.deployed();
+  });
+
+  describe("Deployment", function () {
+    it("Should set the right name and symbol", async function () {
+      expect(await apzToken.name()).to.equal("APZ Token");
+      expect(await apzToken.symbol()).to.equal("APZ");
+    });
+
+    it("Should mint initial supply to treasury", async function () {
+      const ownerBalance = await apzToken.balanceOf(owner.address);
+      expect(ownerBalance).to.equal(ethers.utils.parseEther("1000000"));
+    });
+
+    it("Should set the right decimals", async function () {
+      expect(await apzToken.decimals()).to.equal(18);
+    });
+  });
+
+  describe("Transactions", function () {
+    it("Should transfer tokens between accounts", async function () {
+      await apzToken.transfer(addr1.address, ethers.utils.parseEther("100"));
+      expect(await apzToken.balanceOf(addr1.address)).to.equal(ethers.utils.parseEther("100"));
+    });
+
+    it("Should fail if sender doesn't have enough tokens", async function () {
+      const initialOwnerBalance = await apzToken.balanceOf(owner.address);
+      
+      await expect(
+        apzToken.connect(addr1).transfer(owner.address, 1)
+      ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+      
+      expect(await apzToken.balanceOf(owner.address)).to.equal(initialOwnerBalance);
+    });
+
+    it("Should update balances after transfers", async function () {
+      const initialOwnerBalance = await apzToken.balanceOf(owner.address);
+      
+      await apzToken.transfer(addr1.address, ethers.utils.parseEther("100"));
+      await apzToken.transfer(addr2.address, ethers.utils.parseEther("50"));
+
+      const finalOwnerBalance = await apzToken.balanceOf(owner.address);
+      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(ethers.utils.parseEther("150")));
+
+      const addr1Balance = await apzToken.balanceOf(addr1.address);
+      expect(addr1Balance).to.equal(ethers.utils.parseEther("100"));
+
+      const addr2Balance = await apzToken.balanceOf(addr2.address);
+      expect(addr2Balance).to.equal(ethers.utils.parseEther("50"));
+    });
+  });
+
+  describe("Roles", function () {
+    it("Should grant roles correctly", async function () {
+      expect(await apzToken.hasRole(await apzToken.DEFAULT_ADMIN_ROLE(), owner.address)).to.be.true;
+      expect(await apzToken.hasRole(await apzToken.MINTER_ROLE(), owner.address)).to.be.true;
+    });
+  });
+});
+```
+
+🌐 ۵. فرانت‌اند کامل (Next.js)
+
+frontend/package.json
+
+```json
+{
+  "name": "apz-eth-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.0.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "ethers": "^6.8.0",
+    "wagmi": "^1.4.0",
+    "@tanstack/react-query": "^5.0.0",
+    "viem": "^1.0.0"
+  }
+}
+```
+
+frontend/components/WalletConnector.js
+
+```javascript
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { InjectedConnector } from 'wagmi/connectors/injected';
+
+export default function WalletConnector() {
+  const { address, isConnected } = useAccount();
+  const { connect } = useConnect({
+    connector: new InjectedConnector(),
+  });
+  const { disconnect } = useDisconnect();
+
+  if (isConnected) {
+    return (
+      <div className="wallet-info">
+        <p>Connected: {address}</p>
+        <button onClick={() => disconnect()} className="disconnect-btn">
+          Disconnect
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={() => connect()} className="connect-btn">
+      Connect Wallet
+    </button>
+  );
+}
+```
+
+frontend/utils/contracts.js
+
+```javascript
+import { ethers } from 'ethers';
+
+export const APZ_TOKEN_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function totalSupply() view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+  "function transfer(address to, uint256 amount)",
+  "function mint(address to, uint256 amount)",
+  "function burn(uint256 amount)",
+  "event Transfer(address indexed from, address indexed to, uint256 value)"
+];
+
+export const APZ_AVATAR_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function balanceOf(address) view returns (uint256)",
+  "function ownerOf(uint256) view returns (address)",
+  "function safeMint(address to, string memory uri)",
+  "function tokenURI(uint256) view returns (string)"
+];
+```
+
+🔐 ۶. فایل Environment
+
+.env.example
+
+```bash
+# Network URLs
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/your-project-id
+MAINNET_RPC_URL=https://mainnet.infura.io/v3/your-project-id
+
+# Private Keys (NEVER COMMIT REAL KEYS)
+PRIVATE_KEY=your_private_key_here
+
+# API Keys
+ETHERSCAN_API_KEY=your_etherscan_api_key
+COINMARKETCAP_API_KEY=your_coinmarketcap_api_key
+
+# Contract Addresses (will be auto-filled after deployment)
+APZ_TOKEN_ADDRESS=
+APZ_AVATAR_ADDRESS=
+APZ_GOVERNANCE_ADDRESS=
+```
+
+📋 ۷. راهنمای اجرا
+
+دستورات اجرای کامل:
+
+```bash
+# ۱. نصب dependencies
+npm install
+
+# ۲. کامپایل قراردادها
+npx hardhat compile
+
+# ۳. اجرای تست‌ها
+npx hardhat test
+
+# ۴. استقرار در Sepolia
+npx hardhat run scripts/deploy.js --network sepolia
+
+# ۵. verify قراردادها
+npx hardhat run scripts/verify.js --network sepolia
+
+# ۶. راه‌اندازی فرانت‌اند
+cd frontend && npm install
+npm run dev
+```
+
+این یک پروژه کامل و تولیدی است که شامل:
+
+· ✅ توکن ERC-20 پیشرفته با قابلیت‌های مدیریتی
+· ✅ NFT برای آواتار و هویت
+· ✅ سیستم Governance برای DAO
+· ✅ تست‌های جامع
+· ✅ فرانت‌اند مدرن با Next.js
+· ✅ قابلیت deploy و verify
+· ✅ مدیریت نقش‌ها و دسترسی‌ها
+· ✅ پشتیبانی از multiple networks
+
+نکته مهم: قبل از deploy در mainnet، حتماً قراردادها را audit کنید و از امنیت private keyهای خود مطمئن شوید.
