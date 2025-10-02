@@ -1,0 +1,21 @@
+🔐 ۶. فایل Environment
+
+.env.example
+
+```bash
+# Network URLs
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/your-project-id
+MAINNET_RPC_URL=https://mainnet.infura.io/v3/your-project-id
+
+# Private Keys (NEVER COMMIT REAL KEYS)
+PRIVATE_KEY=your_private_key_here
+
+# API Keys
+ETHERSCAN_API_KEY=your_etherscan_api_key
+COINMARKETCAP_API_KEY=your_coinmarketcap_api_key
+
+# Contract Addresses (will be auto-filled after deployment)
+APZ_TOKEN_ADDRESS=
+APZ_AVATAR_ADDRESS=
+APZ_GOVERNANCE_ADDRESS=
+```
