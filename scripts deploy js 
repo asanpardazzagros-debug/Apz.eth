@@ -1,0 +1,66 @@
+const { ethers } = require("hardhat");
+const fs = require("fs");
+
+async function main() {
+  const [deployer] = await ethers.getSigners();
+  
+  console.log("🚀 Starting deployment with account:", deployer.address);
+  console.log("💰 Account balance:", ethers.utils.formatEther(await deployer.getBalance()), "ETH");
+
+  // Deploy APZ Token
+  console.log("\n📦 Deploying APZToken...");
+  const APZToken = await ethers.getContractFactory("APZToken");
+  const apzToken = await APZToken.deploy(
+    "APZ Token",
+    "APZ",
+    18,
+    ethers.utils.parseEther("1000000"), // 1M tokens
+    deployer.address // Treasury
+  );
+  await apzToken.deployed();
+  console.log("✅ APZToken deployed to:", apzToken.address);
+
+  // Deploy APZ Avatar NFT
+  console.log("\n🎨 Deploying APZAvatar...");
+  const APZAvatar = await ethers.getContractFactory("APZAvatar");
+  const apzAvatar = await APZAvatar.deploy();
+  await apzAvatar.deployed();
+  console.log("✅ APZAvatar deployed to:", apzAvatar.address);
+
+  // Deploy Governance
+  console.log("\n🏛️ Deploying APZGovernance...");
+  const APZGovernance = await ethers.getContractFactory("APZGovernance");
+  const apzGovernance = await APZGovernance.deploy(apzToken.address);
+  await apzGovernance.deployed();
+  console.log("✅ APZGovernance deployed to:", apzGovernance.address);
+
+  // Save deployment info
+  const deploymentInfo = {
+    network: network.name,
+    timestamp: new Date().toISOString(),
+    contracts: {
+      APZToken: apzToken.address,
+      APZAvatar: apzAvatar.address,
+      APZGovernance: apzGovernance.address,
+    },
+    deployer: deployer.address,
+  };
+
+  fs.writeFileSync("deployment-info.json", JSON.stringify(deploymentInfo, null, 2));
+  
+  console.log("\n📄 Deployment info saved to deployment-info.json");
+  console.log("🎉 Deployment completed successfully!");
+
+  // Verification info
+  console.log("\n🔍 To verify contracts run:");
+  console.log(`npx hardhat verify --network ${network.name} ${apzToken.address} "APZ Token" "APZ" 18 1000000 ${deployer.address}`);
+  console.log(`npx hardhat verify --network ${network.name} ${apzAvatar.address}`);
+  console.log(`npx hardhat verify --network ${network.name} ${apzGovernance.address} ${apzToken.address}`);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error("💥 Deployment failed:", error);
+    process.exit(1);
+  });
