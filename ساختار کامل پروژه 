@@ -1,0 +1,20 @@
+apz-eth-project/
+├── contracts/
+│   ├── APZToken.sol
+│   ├── APZAvatar.sol
+│   └── APZGovernance.sol
+├── scripts/
+│   ├── deploy.js
+│   ├── verify.js
+│   └── setup-ens.js
+├── frontend/
+│   ├── components/
+│   ├── pages/
+│   ├── styles/
+│   └── utils/
+├── tests/
+│   ├── APZToken.test.js
+│   └── APZAvatar.test.js
+├── hardhat.config.js
+├── package.json
+└── README.md
