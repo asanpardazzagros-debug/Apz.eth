@@ -1,0 +1,100 @@
+
+📦 ۱. فایل پیکربندی کامل
+
+package.json
+
+```json
+{
+  "name": "apz-eth-project",
+  "version": "1.0.0",
+  "description": "Complete Web3 project for apz.eth",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.js --network sepolia",
+    "deploy-mainnet": "npx hardhat run scripts/deploy.js --network mainnet",
+    "test": "npx hardhat test",
+    "test:coverage": "npx hardhat coverage",
+    "verify": "npx hardhat run scripts/verify.js --network sepolia",
+    "frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^1.0.9",
+    "solidity-coverage": "^0.8.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.0",
+    "@ensdomains/ens-contracts": "^0.0.1",
+    "dotenv": "^16.3.0",
+    "ethers": "^6.8.0"
+  }
+}
+```
+
+hardhat.config.js
+
+```javascript
+require("@nomicfoundation/hardhat-toolbox");
+require("hardhat-gas-reporter");
+require("solidity-coverage");
+require("dotenv").config();
+
+const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "";
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
+
+module.exports = {
+  defaultNetwork: "hardhat",
+  networks: {
+    hardhat: {
+      chainId: 31337,
+      allowUnlimitedContractSize: true,
+    },
+    localhost: {
+      chainId: 31337,
+      allowUnlimitedContractSize: true,
+    },
+    sepolia: {
+      url: SEPOLIA_RPC_URL,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      chainId: 11155111,
+      gas: 2100000,
+      gasPrice: 8000000000,
+    },
+    mainnet: {
+      url: process.env.MAINNET_RPC_URL || "",
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      chainId: 1,
+      gas: 2100000,
+      gasPrice: 30000000000, // 30 gwei
+    },
+  },
+  solidity: {
+    version: "0.8.19",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1000,
+      },
+      viaIR: true,
+    },
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY,
+  },
+  gasReporter: {
+    enabled: true,
+    currency: "USD",
+    outputFile: "gas-report.txt",
+    noColors: true,
+    coinmarketcap: COINMARKETCAP_API_KEY,
+  },
+  mocha: {
+    timeout: 200000,
+  },
+};
+```
